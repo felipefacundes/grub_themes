@@ -1,3 +1,5 @@
+# grub_themes
+
 There is a wide variety of GRUB themes created by the community, adding a special touch to your bootloader before the operating system initializes. However, finding quality themes can be challenging, as they are scattered across various websites. As I’ve heard from other users, many of the themes available on platforms like Pling (currently the largest repository of GRUB themes) lack refinement and may require considerable time to evaluate.
 
 With this in mind, I decided to organize this page to highlight some of the best themes I’ve come across on the internet over time. While not all of them are masterpieces, each one demonstrates a significant level of effort, including elements such as custom backgrounds, appropriate fonts, and well-thought-out color schemes.
