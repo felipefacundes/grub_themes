@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+
+# Grub2 Themes Installer (Local Installation)
+set -o errexit
+
+# Configuração Global
+readonly Project_Name="GRUB2::THEMES (Local)"
+readonly MAX_DELAY=20                              # Tempo máximo para entrada de dados do usuário
+
+DEST_DIR="$HOME/.local/share/grub/themes"
+REO_DIR="$(cd $(dirname "$0") && pwd)"
+
+name=Graphite
+SCREEN_VARIANTS=('1080p' '2k' '4k')
+
+# Cores para mensagens
+CDEF="\033[0m"
+CCIN="\033[0;36m"
+CGSC="\033[0;32m"
+CRER="\033[0;31m"
+CWAR="\033[0;33m"
+b_CDEF="\033[1;37m"
+b_CCIN="\033[1;36m"
+b_CGSC="\033[1;32m"
+b_CRER="\033[1;31m"
+b_CWAR="\033[1;33m"
+
+# Função para exibir mensagens com cores
+prompt () {
+  case ${1} in
+    "-s"|"--success")
+      echo -e "${b_CGSC}${@/-s/}${CDEF}";;
+    "-e"|"--error")
+      echo -e "${b_CRER}${@/-e/}${CDEF}";;
+    "-w"|"--warning")
+      echo -e "${b_CWAR}${@/-w/}${CDEF}";;
+    "-i"|"--info")
+      echo -e "${b_CCIN}${@/-i/}${CDEF}";;
+    *)
+      echo -e "$@";;
+  esac
+}
+
+# Verificação de comando
+has_command() {
+  command -v "$1" > /dev/null
+}
+
+# Função de uso/ajuda
+usage() {
+  printf "%s\n" "Usage: ${0##*/} [OPTIONS...]"
+  printf "\n%s\n" "OPTIONS:"
+  printf "  %-25s%s\n" "-s, --screen" "Define a variante de tela [1080p|2k|4k] (padrão: 1080p)"
+  printf "  %-25s%s\n" "-r, --remove" "Remove o tema instalado"
+  printf "  %-25s%s\n" "-h, --help" "Mostra esta ajuda"
+}
+
+# Instalar tema
+install() {
+  local screen="${1}"
+  local THEME_DIR="${DEST_DIR}/${name}"
+
+  # Criar diretório do tema
+  prompt -s "\n Verificando diretório de temas..."
+  [[ -d "${THEME_DIR}" ]] && rm -rf "${THEME_DIR}"
+  mkdir -p "${THEME_DIR}"
+
+  # Copiar arquivos do tema
+  prompt -s "\n Instalando o tema ${name} (${screen})..."
+  cp -a "${REO_DIR}/common/"{*.png,*.pf2} "${THEME_DIR}"
+  cp -a "${REO_DIR}/config/theme-${screen}.txt" "${THEME_DIR}/theme.txt"
+  cp -a "${REO_DIR}/backgrounds/${screen}/wave-dark.png" "${THEME_DIR}/background.png"
+  cp -a "${REO_DIR}/assets/logos/${screen}" "${THEME_DIR}/icons"
+  cp -a "${REO_DIR}/assets/assets/${screen}/"*.png "${THEME_DIR}"
+
+  prompt -w "\n Tema '${name}' instalado com sucesso no diretório: ${THEME_DIR}.\n"
+}
+
+# Remover tema
+remove() {
+  local THEME_DIR="${DEST_DIR}/${name}"
+
+  prompt -s "\n Removendo tema..."
+  if [[ -d "${THEME_DIR}" ]]; then
+    rm -rf "${THEME_DIR}"
+    prompt -s "\n Tema removido com sucesso."
+  else
+    prompt -e "\n Tema '${name}' não encontrado no diretório: ${DEST_DIR}."
+  fi
+}
+
+# Processar argumentos
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -s|--screen)
+      shift
+      screen="$1"
+      if [[ ! " ${SCREEN_VARIANTS[*]} " =~ " ${screen} " ]]; then
+        prompt -e "\n Opção de tela inválida: ${screen}. Use 1080p, 2k ou 4k."
+        exit 1
+      fi
+      shift
+      ;;
+    -r|--remove)
+      remove
+      exit 0
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      prompt -e "\n Opção inválida: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+# Executar instalação padrão se nenhum argumento for especificado
+if [[ -z "${screen}" ]]; then
+  screen="1080p"
+fi
+
+install "${screen}"

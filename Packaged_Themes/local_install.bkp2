@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+
+# Project information
+readonly Project_Name="GRUB2::THEMES Local Install"
+
+# Theme variants and configuration
+THEME_VARIANTS=('tela' 'vimix' 'stylish' 'whitesur')
+ICON_VARIANTS=('color' 'white' 'whitesur')
+SCREEN_VARIANTS=('1080p' '2k' '4k' 'ultrawide' 'ultrawide2k')
+custom_resolution=""
+
+# Set default local theme directory in user's home
+DEFAULT_THEME_DIR="$HOME/.local/share/grub-themes"
+THEME_DIR="${DEFAULT_THEME_DIR}"
+REO_DIR="$(cd $(dirname $0) && pwd)"
+
+# Color definitions
+CDEF="\033[0m"                                     # default color
+CCIN="\033[0;36m"                                  # info color
+CGSC="\033[0;32m"                                  # success color
+CRER="\033[0;31m"                                  # error color
+CWAR="\033[0;33m"                                  # warning color
+b_CDEF="\033[1;37m"                               # bold default color
+b_CCIN="\033[1;36m"                               # bold info color
+b_CGSC="\033[1;32m"                               # bold success color
+b_CRER="\033[1;31m"                               # bold error color
+b_CWAR="\033[1;33m"                               # bold warning color
+
+# Print formatted messages
+prompt() {
+  case ${1} in
+    "-s"|"--success")
+      echo -e "${b_CGSC}${@/-s/}${CDEF}";;    # print success message
+    "-e"|"--error")
+      echo -e "${b_CRER}${@/-e/}${CDEF}";;    # print error message
+    "-w"|"--warning")
+      echo -e "${b_CWAR}${@/-w/}${CDEF}";;    # print warning message
+    "-i"|"--info")
+      echo -e "${b_CCIN}${@/-i/}${CDEF}";;    # print info message
+    *)
+    echo -e "$@"
+    ;;
+  esac
+}
+
+# Check command availability
+function has_command() {
+  command -v $1 &> /dev/null
+}
+
+# Show help message
+usage() {
+cat << EOF
+
+Usage: $0 [OPTION]...
+
+OPTIONS:
+  -t, --theme                 theme variant(s)          [tela|vimix|stylish|whitesur]       (default is tela)
+  -i, --icon                  icon variant(s)           [color|white|whitesur]              (default is color)
+  -s, --screen                screen display variant(s) [1080p|2k|4k|ultrawide|ultrawide2k] (default is 1080p)
+  -c, --custom-resolution     set custom resolution     (e.g., 1600x900)                    (disabled in default)
+  -d, --directory            specify installation directory (default is ~/.local/share/grub-themes)
+  -h, --help                  show this help
+
+EOF
+}
+
+generate() {
+  local theme=$1
+  local icon=$2
+  local screen=$3
+  
+  # Create theme directory if it doesn't exist
+  prompt -i "\n Creating theme directory..."
+  mkdir -p "${THEME_DIR}/${theme}"
+
+  prompt -i "\n Installing ${theme} ${icon} ${screen} theme..."
+
+  # Copy theme files
+  cp -r "${REO_DIR}/common/"*.pf2 "${THEME_DIR}/${theme}"
+  cp -r "${REO_DIR}/config/theme-${screen}.txt" "${THEME_DIR}/${theme}/theme.txt"
+  cp -r "${REO_DIR}/backgrounds/${screen}/background-${theme}.jpg" "${THEME_DIR}/${theme}/background.jpg"
+
+  # Handle custom resolution
+  if [[ -n "$custom_resolution" ]]; then
+    local width=$(echo $custom_resolution | cut -d'x' -f1)
+    local height=$(echo $custom_resolution | cut -d'x' -f2)
+    
+    # Determine asset type based on resolution
+    local asset_type
+    if [ $width -le 1920 ] && [ $height -le 1080 ]; then
+      asset_type="1080p"
+    elif [ $width -le 2560 ] && [ $height -le 1440 ]; then
+      asset_type="2k"
+    else
+      asset_type="4k"
+    fi
+
+    # Update theme configuration
+    sed -i "s/[0-9]\+x[0-9]\+/${custom_resolution}/" "${THEME_DIR}/${theme}/theme.txt"
+    cp -r "${REO_DIR}/assets/assets-${icon}/icons-${asset_type}" "${THEME_DIR}/${theme}/icons"
+    cp -r "${REO_DIR}/assets/assets-select/select-${asset_type}/"*.png "${THEME_DIR}/${theme}"
+    cp -r "${REO_DIR}/assets/info-${asset_type}.png" "${THEME_DIR}/${theme}/info.png"
+  else
+    # Use standard resolution assets
+    cp -r "${REO_DIR}/assets/assets-${icon}/icons-${screen}" "${THEME_DIR}/${theme}/icons"
+    cp -r "${REO_DIR}/assets/assets-select/select-${screen}/"*.png "${THEME_DIR}/${theme}"
+    cp -r "${REO_DIR}/assets/info-${screen}.png" "${THEME_DIR}/${theme}/info.png"
+  fi
+
+  prompt -s "\n Theme installed successfully to: ${THEME_DIR}/${theme}"
+  prompt -i "\n To use this theme, you'll need to manually update your GRUB configuration to point to:"
+  prompt -i " ${THEME_DIR}/${theme}/theme.txt"
+}
+
+# Main script execution
+main() {
+  local theme="tela"
+  local icon="color"
+  local screen="1080p"
+
+  # Parse command line arguments
+  while [[ $# -gt 0 ]]; do
+    case "${1}" in
+      -t|--theme)
+        theme="$2"
+        shift 2
+        ;;
+      -i|--icon)
+        icon="$2"
+        shift 2
+        ;;
+      -s|--screen)
+        screen="$2"
+        shift 2
+        ;;
+      -c|--custom-resolution)
+        custom_resolution="$2"
+        shift 2
+        ;;
+      -d|--directory)
+        THEME_DIR="$2"
+        shift 2
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        prompt -e "ERROR: Unknown option '$1'"
+        usage
+        exit 1
+        ;;
+    esac
+  done
+
+  # Validate theme selection
+  if [[ ! " ${THEME_VARIANTS[@]} " =~ " ${theme} " ]]; then
+    prompt -e "ERROR: Invalid theme '${theme}'"
+    exit 1
+  fi
+
+  # Validate icon selection
+  if [[ ! " ${ICON_VARIANTS[@]} " =~ " ${icon} " ]]; then
+    prompt -e "ERROR: Invalid icon variant '${icon}'"
+    exit 1
+  fi
+
+  # Validate screen selection
+  if [[ ! " ${SCREEN_VARIANTS[@]} " =~ " ${screen} " ]]; then
+    prompt -e "ERROR: Invalid screen variant '${screen}'"
+    exit 1
+  fi
+
+  # Generate theme
+  generate "${theme}" "${icon}" "${screen}"
+}
+
+# Start script execution
+main "$@"

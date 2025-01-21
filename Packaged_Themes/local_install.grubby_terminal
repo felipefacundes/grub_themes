@@ -1,0 +1,84 @@
+#!/bin/bash
+
+# Verifica se o script está sendo executado no diretório correto
+if [ ! -f "theme.txt" ]; then
+    echo -e "\e[91mThis script must be run from its own directory.\e[0m" >&2
+    exit 1
+fi
+
+# Define diretórios locais
+THEMES_DIR="${HOME}/.local/share/grub/themes"
+DEST_DIR="${THEMES_DIR}/Grubby-Terminal"
+
+echo -e "\e[0m\nThis script will install the \e[92mGrubby Terminal\e[0m theme to ${DEST_DIR},"
+echo -e "\e[91mwithout modifying system files directly.\e[0m"
+echo -e "You will need to manually configure GRUB to apply the theme.\n"
+echo -e "\e[96mMake sure to backup your GRUB configuration before applying any changes.\n\e[0m"
+echo -en "Would you like to continue ('\e[92my\e[0m' to continue, any other key to exit)? "
+
+read RESPONSE
+if [ "$RESPONSE" != 'y' ]; then
+    echo
+    exit 0
+fi
+
+# Solicita resolução do usuário
+while [ true ]; do
+    echo -ne "\n\e[92mWidth: \e[0m"
+    read RESOLUTION_WIDTH
+    if [[ $RESOLUTION_WIDTH =~ ^[0-9]+$ ]] && [ $RESOLUTION_WIDTH -gt 700 ]; then
+        break
+    else
+        echo -ne "\n\e[91mValue must be a whole number, larger than 700. \e[0m\n"
+    fi
+done
+
+while [ true ]; do
+    echo -ne "\n\e[92mHeight: \e[0m"
+    read RESOLUTION_HEIGHT
+    if [[ $RESOLUTION_HEIGHT =~ ^[0-9]+$ ]] && [ $RESOLUTION_HEIGHT -gt 700 ]; then
+        break
+    else
+        echo -ne "\n\e[91mValue must be a whole number, larger than 700. \e[0m\n"
+    fi
+done
+
+# Cria diretórios se necessário
+mkdir -p $DEST_DIR
+
+# Copia os arquivos necessários
+echo -e "\n\e[92mCopying files to ${DEST_DIR}\e[0m"
+cp -fv *\.png *\.pf2 $DEST_DIR
+
+# Calcula posições baseadas na resolução
+TERMINAL_X=$((( RESOLUTION_WIDTH - 700 ) / 2 ))
+TERMINAL_Y=$((( RESOLUTION_HEIGHT - 700 ) / 2 ))
+
+BOOT_MENU_X=$(( TERMINAL_X + 60 ))
+BOOT_MENU_Y=$(( TERMINAL_Y + 316 ))
+
+PROGRESS_BAR_X=$(( TERMINAL_X + 45 ))
+PROGRESS_BAR_Y=$(( TERMINAL_Y + 611 ))
+
+PROGRESS_LBL_X=$(( PROGRESS_BAR_X + 10 ))
+PROGRESS_LBL_Y=$(( PROGRESS_BAR_Y + 2 ))
+
+# Prepara o arquivo theme.txt
+echo -e "\n\e[92mPreparing theme.txt\e[0m"
+sed \
+    -e "s/TERMINAL_X/$TERMINAL_X/" \
+    -e "s/TERMINAL_Y/$TERMINAL_Y/" \
+    -e "s/BOOT_MENU_X/$BOOT_MENU_X/" \
+    -e "s/BOOT_MENU_Y/$BOOT_MENU_Y/" \
+    -e "s/PROGRESS_BAR_X/$PROGRESS_BAR_X/" \
+    -e "s/PROGRESS_BAR_Y/$PROGRESS_BAR_Y/" \
+    -e "s/PROGRESS_LBL_X/$PROGRESS_LBL_X/" \
+    -e "s/PROGRESS_LBL_Y/$PROGRESS_LBL_Y/" \
+    theme.txt > "$DEST_DIR/theme.txt"
+
+echo -e "\n\e[92mInstallation complete.\e[0m"
+echo -e "To apply the theme, add the following lines to your GRUB configuration file:"
+echo -e "\e[96mGRUB_GFXMODE=${RESOLUTION_WIDTH}x${RESOLUTION_HEIGHT}"
+echo -e "GRUB_THEME=\"${DEST_DIR}/theme.txt\"\e[0m\n"
+echo -e "Then run \e[92mupdate-grub\e[0m (or the equivalent for your system).\n"
+echo -e "Enjoy the \e[92mGrubby Terminal\e[0m theme! :D"

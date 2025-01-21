@@ -1,0 +1,253 @@
+#!/bin/bash
+
+# Configuration constants
+THEME_NAME="Matter"
+THEME_DESCRIPTION="Matter is a minimalist grub theme inspired by material design 2"
+
+# Define paths
+HOME_DIR="$HOME"
+INSTALLER_DIR="$(pwd)"
+INSTALLATION_SOURCE_DIR="$INSTALLER_DIR/$THEME_NAME"
+LOCAL_THEMES_DIR="$HOME/.local/share/grub/themes"
+INSTALLATION_TARGET_DIR="$LOCAL_THEMES_DIR/$THEME_NAME"
+
+# Default theme settings
+THEME_DEFAULT_HIGHLIGHT="pink"
+THEME_DEFAULT_FOREGROUND="white"
+THEME_DEFAULT_BACKGROUND="bluegrey-900"
+THEME_DEFAULT_FONT_NAME="Josefin Sans Regular"
+THEME_DEFAULT_FONT="Josefin_Sans_Regular"
+THEME_DEFAULT_FONT_SIZE=32
+
+# Color palette
+declare -A PALETTE
+PALETTE[red]="f44336"
+PALETTE[pink]="e91e63"
+PALETTE[purple]="9c27b0"
+PALETTE[deeppurple]="673ab7"
+PALETTE[indigo]="3f51b5"
+PALETTE[blue]="2196f3"
+PALETTE[lightblue]="03a9f4"
+PALETTE[cyan]="00bcd4"
+PALETTE[teal]="009688"
+PALETTE[green]="4caf50"
+PALETTE[lightgreen]="8bc34a"
+PALETTE[lime]="cddc39"
+PALETTE[yellow]="ffeb3b"
+PALETTE[amber]="ffc107"
+PALETTE[orange]="ff9800"
+PALETTE[deeporange]="ff5722"
+PALETTE[brown]="795548"
+PALETTE[grey]="9e9e9e"
+PALETTE[bluegrey]="607d8b"
+PALETTE[white]="ffffff"
+PALETTE[black]="000000"
+PALETTE[white-350]="9E9E9E"
+PALETTE[bluegrey-900]="263238"
+
+# Utility functions
+info() {
+    echo -e "\033[1;34m[INFO]\033[0m $1"
+}
+
+warning() {
+    echo -e "\033[1;33m[WARNING]\033[0m $1"
+}
+
+error() {
+    echo -e "\033[1;31m[ERROR]\033[0m $1"
+    exit 1
+}
+
+parse_color() {
+    local color_string="$1"
+    if [[ -n "${PALETTE[$color_string]}" ]]; then
+        echo "#${PALETTE[$color_string]}"
+    elif [[ $color_string =~ ^[0-9A-Fa-f]{6}$ ]]; then
+        echo "#$color_string"
+    else
+        error "Invalid color: $color_string"
+    fi
+}
+
+check_dependencies() {
+    local deps=("inkscape" "convert" "wget" "grub-mkfont")
+    for dep in "${deps[@]}"; do
+        if ! command -v "$dep" &> /dev/null; then
+            warning "Required dependency '$dep' is not installed"
+        fi
+    done
+}
+
+prepare_directories() {
+    info "Creating local installation directories"
+    mkdir -p "$LOCAL_THEMES_DIR"
+    mkdir -p "$INSTALLATION_SOURCE_DIR/icons"
+    mkdir -p "$INSTALLATION_SOURCE_DIR/bg"
+    
+    if [ -d "$INSTALLATION_TARGET_DIR" ]; then
+        rm -rf "$INSTALLATION_TARGET_DIR"
+    fi
+}
+
+download_icon() {
+    local icon_name="$1"
+    local mdi_cdn="https://raw.githubusercontent.com/Templarian/MaterialDesign-SVG/master/svg"
+    local icon_path="$INSTALLATION_SOURCE_DIR/icons/$icon_name.svg"
+    
+    mkdir -p "$(dirname "$icon_path")"
+    
+    if [ ! -f "$icon_path" ]; then
+        info "Downloading icon: $icon_name"
+        wget -q "$mdi_cdn/$icon_name.svg" -O "$icon_path"
+        if [ $? -ne 0 ]; then
+            error "Failed to download icon: $icon_name"
+        fi
+    fi
+}
+
+convert_icon() {
+    local icon_name="$1"
+    local color="$2"
+    local src_path="$INSTALLATION_SOURCE_DIR/icons/$icon_name.svg"
+    local dst_path="$INSTALLATION_SOURCE_DIR/icons/$icon_name.png"
+    
+    info "Converting icon: $icon_name"
+    
+    if command -v inkscape &> /dev/null; then
+        # Usando Inkscape para converter SVG para PNG
+        inkscape --export-type=png \
+                --export-filename="$dst_path" \
+                --export-background-opacity=0 \
+                --export-width=32 \
+                --export-height=32 \
+                "$src_path" >/dev/null 2>&1
+    else
+        # Fallback para ImageMagick
+        convert -background none \
+                -resize 32x32 \
+                "$src_path" \
+                "$dst_path"
+    fi
+}
+
+generate_font() {
+    info "Generating font"
+    local font_file="$INSTALLER_DIR/fonts/$THEME_DEFAULT_FONT.ttf"
+    local output_file="$INSTALLATION_SOURCE_DIR/font.pf2"
+    
+    if [ ! -f "$font_file" ]; then
+        error "Font file not found: $font_file"
+    fi
+    
+    grub-mkfont -o "$output_file" "$font_file" -s $THEME_DEFAULT_FONT_SIZE
+    
+    if [ ! -f "$output_file" ]; then
+        error "Failed to generate font file"
+    fi
+}
+
+generate_background() {
+    info "Generating background"
+    local background_color="$1"
+    local output_file="$INSTALLATION_SOURCE_DIR/background.png"
+    
+    # Create a solid color background
+    convert -size 1920x1080 xc:"$background_color" "$output_file"
+    
+    if [ ! -f "$output_file" ]; then
+        error "Failed to generate background"
+    fi
+}
+
+install_theme() {
+    local highlight="$1"
+    local foreground="$2"
+    local background="$3"
+    local icons=("${@:4}")
+    
+    prepare_directories
+    
+    # Generate background
+    generate_background "$background"
+    
+    # Generate font
+    generate_font
+    
+    # Process icons
+    for icon in "${icons[@]}"; do
+        if [ "$icon" != "_" ]; then
+            download_icon "$icon"
+            convert_icon "$icon" "$foreground"
+        fi
+    done
+    
+    # Create theme directory structure
+    mkdir -p "$INSTALLATION_TARGET_DIR/icons"
+    
+    # Copy theme files
+    cp -r "$INSTALLATION_SOURCE_DIR"/* "$INSTALLATION_TARGET_DIR/"
+    
+    # Generate theme.txt
+    cat > "$INSTALLATION_TARGET_DIR/theme.txt" << EOF
+# Matter GRUB theme
+desktop-image: "background.png"
+desktop-color: "$background"
+terminal-font: "$THEME_DEFAULT_FONT_NAME $THEME_DEFAULT_FONT_SIZE"
+terminal-left: 0
+terminal-top: 0
+terminal-width: 100%
+terminal-height: 100%
+terminal-border: 0
+
++ boot_menu {
+    left = 30%
+    top = 30%
+    width = 40%
+    height = 40%
+    item_font = "$THEME_DEFAULT_FONT_NAME $THEME_DEFAULT_FONT_SIZE"
+    item_color = "$foreground"
+    selected_item_color = "$highlight"
+    icon_width = 32
+    icon_height = 32
+    item_height = 48
+    item_spacing = 12
+    selected_item_pixmap_style = "selected_*.png"
+}
+
++ progress_bar {
+    id = "__timeout__"
+    left = 0
+    top = 100%-50
+    height = 20
+    width = 100%
+    font = "$THEME_DEFAULT_FONT_NAME $THEME_DEFAULT_FONT_SIZE"
+    text_color = "$foreground"
+    fg_color = "$highlight"
+    bg_color = "$background"
+    border_color = "$background"
+    text = "Booting in %d seconds..."
+}
+EOF
+
+    info "Theme installed successfully to $INSTALLATION_TARGET_DIR"
+    info "To use this theme, you'll need to manually configure your GRUB configuration"
+    info "Add these lines to your GRUB configuration:"
+    echo "GRUB_THEME=\"$INSTALLATION_TARGET_DIR/theme.txt\""
+    echo "GRUB_GFXMODE=1920x1080,auto"
+}
+
+# Main script execution
+main() {
+    check_dependencies
+    
+    # Default values
+    local highlight=$(parse_color "$THEME_DEFAULT_HIGHLIGHT")
+    local foreground=$(parse_color "$THEME_DEFAULT_FOREGROUND")
+    local background=$(parse_color "$THEME_DEFAULT_BACKGROUND")
+    local icons=("ubuntu" "windows" "apple" "linux")
+    
+    install_theme "$highlight" "$foreground" "$background" "${icons[@]}"
+}
+
+main "$@"
